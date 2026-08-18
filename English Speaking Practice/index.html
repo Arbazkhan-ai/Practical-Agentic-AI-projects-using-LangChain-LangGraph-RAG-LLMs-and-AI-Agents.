@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="description" content="Practice English speaking with Leo, your friendly AI companion. Real-time casual conversation and instant feedback." />
+  <title>TalkWithLeo – AI English Speaking Buddy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════
+       DESIGN SYSTEM & TOKENS
+    ═══════════════════════════════════════════ */
+    :root {
+      --clr-bg:        hsl(222, 30%, 97%);
+      --clr-surface:   hsl(0, 0%, 100%);
+      --clr-surface2:  hsl(220, 25%, 94%);
+      --clr-border:    hsl(220, 20%, 88%);
+      --clr-primary:   hsl(217, 91%, 60%);
+      --clr-primary-d: hsl(221, 83%, 53%);
+      --clr-primary-l: hsl(217, 91%, 95%);
+      --clr-accent:    hsl(199, 89%, 48%);
+      --clr-green:     hsl(152, 69%, 40%);
+      --clr-green-l:   hsl(152, 69%, 94%);
+      --clr-red:       hsl(354, 70%, 54%);
+      --clr-red-l:     hsl(354, 70%, 95%);
+      --clr-text:      hsl(222, 47%, 11%);
+      --clr-text-2:    hsl(215, 20%, 40%);
+      --clr-text-3:    hsl(215, 16%, 60%);
+      --avatar-size:   clamp(190px, 36vw, 260px);
+      --radius-sm:     8px;
+      --radius-md:     14px;
+      --radius-lg:     20px;
+      --radius-xl:     28px;
+      --shadow-sm:     0 2px 6px hsl(222 30% 10% / .05);
+      --shadow-md:     0 8px 24px hsl(222 30% 10% / .08);
+      --shadow-lg:     0 16px 40px hsl(222 30% 10% / .12);
+      --transition:    all .2s cubic-bezier(.4,0,.2,1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--clr-bg);
+      color: var(--clr-text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; }
+    input, select { font-family: inherit; }
+
+    /* ═══════════════════════════════════════════
+       HEADER
+    ═══════════════════════════════════════════ */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 24px;
+      background: hsla(0,0%,100%,.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--clr-border);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.3rem; font-weight: 800;
+      color: var(--clr-primary-d);
+      letter-spacing: -0.02em;
+    }
+    .logo-badge {
+      font-size: 0.65rem;
+      background: var(--clr-primary-l);
+      color: var(--clr-primary-d);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .session-timer {
+      font-size: .85rem; font-weight: 700; color: var(--clr-text-2);
+      background: var(--clr-surface2);
+      padding: 5px 12px; border-radius: 20px;
+      display: none;
+    }
+    .session-timer.active { display: block; }
+    .btn-icon {
+      width: 38px; height: 38px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--clr-text-2); font-size: 19px;
+      background: var(--clr-surface2);
+      transition: var(--transition);
+    }
+    .btn-icon:hover { background: var(--clr-border); color: var(--clr-text); }
+
+    /* ═══════════════════════════════════════════
+       SETTINGS MODAL
+    ═══════════════════════════════════════════ */
+    .settings-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: hsl(222 40% 10% / .45);
+      backdrop-filter: blur(6px);
+      display: none; align-items: flex-end; justify-content: center;
+    }
+    .settings-overlay.open { display: flex; }
+    .settings-panel {
+      width: 100%; max-width: 520px;
+      background: var(--clr-surface);
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      padding: 24px 24px 36px;
+      box-shadow: var(--shadow-lg);
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .settings-handle { width: 40px; height: 4px; border-radius: 2px; background: var(--clr-border); margin: 0 auto 16px; }
+    .settings-title { font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 18px; }
+    .settings-row { margin-bottom: 14px; }
+    .settings-label { display: block; font-size: .78rem; font-weight: 700; color: var(--clr-text-2); text-transform: uppercase; margin-bottom: 6px; }
+    .settings-input {
+      width: 100%; padding: 10px 14px;
+      border: 1.5px solid var(--clr-border); border-radius: var(--radius-md);
+      font-size: .9rem; color: var(--clr-text); background: var(--clr-surface);
+      outline: none; transition: var(--transition);
+    }
+    .settings-input:focus { border-color: var(--clr-primary); box-shadow: 0 0 0 3px var(--clr-primary-l); }
+    .btn-save {
+      width: 100%; padding: 12px;
+      background: var(--clr-primary-d); color: white; border-radius: var(--radius-md);
+      font-size: .95rem; font-weight: 700; transition: var(--transition); margin-top: 10px;
+    }
+    .btn-save:hover { filter: brightness(1.08); }
+
+    /* ═══════════════════════════════════════════
+       MAIN LAYOUT
+    ═══════════════════════════════════════════ */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 16px 140px;
+      gap: 16px;
+      max-width: 680px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ═══════════════════════════════════════════
+       BOY AVATAR ZONE (LEO)
+    ═══════════════════════════════════════════ */
+    .avatar-zone {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 22px 20px;
+      background: var(--clr-surface);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--clr-border);
+      position: relative;
+      overflow: hidden;
+    }
+    .avatar-zone::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, var(--clr-primary), var(--clr-accent));
+    }
+    .avatar-wrapper {
+      position: relative;
+      width: var(--avatar-size);
+      height: var(--avatar-size);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .avatar-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Avatar Animations */
+    .boy-character {
+      animation: boyFloat 3.5s ease-in-out infinite;
+      transform-origin: center bottom;
+    }
+    @keyframes boyFloat {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-7px); }
+    }
+
+    .eye-pupil {
+      transition: transform 0.15s ease;
+    }
+    .eyelid {
+      animation: boyBlink 4.2s infinite ease-in-out;
+      transform-origin: center top;
+    }
+    @keyframes boyBlink {
+      0%, 93%, 100% { transform: scaleY(0); }
+      96%           { transform: scaleY(1); }
+    }
+
+    /* Aura glow ring */
+    .glow-ring {
+      position: absolute; inset: -8px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      transition: var(--transition);
+      pointer-events: none;
+    }
+    .state-listening .glow-ring {
+      border-color: hsl(217, 91%, 60%, .7);
+      animation: auraPulse 1.2s infinite ease-in-out;
+      box-shadow: 0 0 30px hsl(217, 91%, 60%, .3);
+    }
+    .state-thinking .glow-ring {
+      border-color: hsl(38, 92%, 50%, .7);
+      animation: auraPulse 1.5s infinite ease-in-out;
+      box-shadow: 0 0 30px hsl(38, 92%, 50%, .3);
+    }
+    .state-speaking .glow-ring {
+      border-color: hsl(152, 69%, 45%, .7);
+      animation: auraPulse 0.9s infinite ease-in-out;
+      box-shadow: 0 0 30px hsl(152, 69%, 45%, .35);
+    }
+    @keyframes auraPulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50%      { transform: scale(1.05); opacity: 0.5; }
+    }
+
+    /* Status indicator */
+    .avatar-status {
+      font-size: .88rem; font-weight: 700;
+      color: var(--clr-text-2);
+      display: flex; align-items: center; gap: 8px;
+      min-height: 26px;
+    }
+    .status-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--clr-text-3);
+      transition: var(--transition);
+    }
+    .state-listening .status-dot { background: var(--clr-primary); animation: dotPulse .7s infinite ease-in-out; }
+    .state-thinking  .status-dot { background: hsl(38, 92%, 50%); animation: dotPulse 1.1s infinite ease-in-out; }
+    .state-speaking  .status-dot { background: var(--clr-green); animation: dotPulse .5s infinite ease-in-out; }
+    @keyframes dotPulse { 0%,100%{opacity:1; transform:scale(1);} 50%{opacity:.4; transform:scale(1.2);} }
+
+    .thinking-spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid hsl(38, 92%, 50%, .3);
+      border-top-color: hsl(38, 92%, 50%);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-thinking .thinking-spinner { display: inline-block; }
+
+    /* Speech Bubble */
+    .avatar-bubble {
+      background: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(199, 89%, 48%));
+      color: white;
+      padding: 12px 18px;
+      border-radius: 4px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+      font-size: .92rem;
+      line-height: 1.5;
+      max-width: 92%;
+      box-shadow: var(--shadow-md);
+      display: none;
+      font-weight: 600;
+      animation: bubblePop .25s cubic-bezier(.175, .885, .32, 1.275);
+    }
+    .avatar-bubble.visible { display: block; }
+    @keyframes bubblePop { from { opacity:0; transform: scale(.92) translateY(6px); } to { opacity:1; transform: scale(1) translateY(0); } }
+
+    /* ═══════════════════════════════════════════
+       CONTINUOUS CONVERSATION & CONTROLS
+    ═══════════════════════════════════════════ */
+    .auto-mode-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: .75rem; font-weight: 700;
+      color: var(--clr-green);
+      background: var(--clr-green-l);
+      padding: 4px 10px; border-radius: 20px;
+    }
+
+    /* Live Transcript */
+    .transcript-zone {
+      width: 100%;
+      background: var(--clr-surface);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      border: 1px solid var(--clr-border);
+      box-shadow: var(--shadow-sm);
+      min-height: 56px;
+    }
+    .transcript-label {
+      font-size: .72rem; font-weight: 800; color: var(--clr-text-3);
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
+    }
+    .transcript-text {
+      font-size: .95rem; line-height: 1.5; color: var(--clr-text-2);
+      font-style: italic;
+    }
+    .transcript-text.active { color: var(--clr-text); font-style: normal; font-weight: 600; }
+    .cursor-blink { display: inline-block; width: 2px; height: 1em; background: var(--clr-primary); margin-left: 3px; animation: blink .8s step-end infinite; }
+    @keyframes blink { 0%, 100%{opacity:1;} 50%{opacity:0;} }
+
+    /* Conversation Feed */
+    .conversation-feed { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .msg-card {
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      animation: cardIn .25s ease;
+    }
+    @keyframes cardIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .msg-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid var(--clr-border);
+    }
+    .msg-badge { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .msg-name { font-size: .8rem; font-weight: 700; color: var(--clr-text-2); }
+    .msg-time { font-size: .72rem; color: var(--clr-text-3); margin-left: auto; }
+    .msg-body { padding: 10px 14px 12px; }
+    .msg-user-text { font-size: .92rem; font-weight: 500; margin-bottom: 6px; }
+
+    .correction-box {
+      background: var(--clr-green-l);
+      border: 1px solid hsl(152, 69%, 80%);
+      border-radius: var(--radius-md);
+      padding: 8px 12px;
+      font-size: .85rem;
+      color: hsl(152, 69%, 25%);
+      margin-top: 6px;
+    }
+
+    .leo-card {
+      background: linear-gradient(135deg, hsl(217,91%,98%), hsl(199,89%,98%));
+      border: 1px solid hsl(217, 91%, 90%);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: .92rem;
+      line-height: 1.55;
+      font-weight: 500;
+    }
+
+    /* Fixed Bottom Controls */
+    .control-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px;
+      padding: 16px 20px 24px;
+      background: hsla(0,0%,100%,.92);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid var(--clr-border);
+    }
+    .btn-mic {
+      width: 68px; height: 68px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--clr-primary), var(--clr-accent));
+      color: white; font-size: 26px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 22px hsl(217, 91%, 60%, .4);
+      transition: var(--transition);
+      position: relative;
+    }
+    .btn-mic:hover { transform: scale(1.05); }
+    .btn-mic.listening {
+      background: linear-gradient(135deg, var(--clr-red), hsl(340, 80%, 55%));
+      box-shadow: 0 6px 24px hsl(354, 70%, 54%, .45);
+      animation: pulseMic 1s infinite;
+    }
+    @keyframes pulseMic {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.06); }
+    }
+    .btn-end {
+      padding: 0 20px; height: 44px;
+      border-radius: 22px;
+      background: var(--clr-surface2);
+      color: var(--clr-text-2);
+      font-size: .85rem; font-weight: 700;
+      transition: var(--transition);
+      border: 1.5px solid var(--clr-border);
+    }
+    .btn-end:hover { background: var(--clr-red-l); color: var(--clr-red); border-color: hsl(354,70%,85%); }
+
+    .btn-start {
+      padding: 0 32px; height: 50px;
+      border-radius: 25px;
+      background: linear-gradient(135deg, var(--clr-primary), var(--clr-accent));
+      color: white; font-size: 1rem; font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+      box-shadow: var(--shadow-md);
+      transition: var(--transition);
+    }
+    .btn-start:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+    /* Welcome / Pre-session */
+    .welcome-card {
+      width: 100%; background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-xl);
+      padding: 24px; text-align: center; box-shadow: var(--shadow-sm);
+    }
+    .welcome-title { font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+    .welcome-sub { font-size: .88rem; color: var(--clr-text-2); line-height: 1.6; margin-bottom: 16px; }
+    .feature-pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
+    .pill {
+      font-size: .78rem; font-weight: 700;
+      padding: 6px 12px; border-radius: 20px;
+      background: var(--clr-primary-l); color: var(--clr-primary-d);
+    }
+
+    /* Modal / Report */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 400;
+      background: hsl(222 40% 10% / .5);
+      backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      width: 100%; max-width: 500px; max-height: 85dvh;
+      background: var(--clr-surface); border-radius: var(--radius-xl);
+      overflow: hidden; box-shadow: var(--shadow-lg);
+      display: flex; flex-direction: column;
+    }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--clr-border); background: var(--clr-surface2); }
+    .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--clr-border); }
+    .btn-action {
+      width: 100%; padding: 12px;
+      background: var(--clr-primary); color: white; border-radius: var(--radius-md);
+      font-weight: 700; font-family: 'Outfit', sans-serif; font-size: .95rem;
+    }
+
+    /* Session display logic */
+    .session-ui { display: none; }
+    .presession-ui { display: block; }
+    body.session-active .session-ui { display: block; }
+    body.session-active .presession-ui { display: none; }
+
+    /* Toast notification */
+    .toast-box {
+      position: fixed; top: 74px; left: 50%; transform: translateX(-50%);
+      z-index: 500; pointer-events: none; display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      background: var(--clr-text); color: white;
+      padding: 10px 18px; border-radius: var(--radius-md);
+      font-size: .85rem; font-weight: 600; box-shadow: var(--shadow-md);
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast-box" id="toastContainer"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <span>🎙️ TalkWithLeo</span>
+    <span class="logo-badge">Fast Ollama</span>
+  </div>
+  <div class="header-right">
+    <div class="session-timer" id="sessionTimer">00:00</div>
+    <button class="btn-icon" id="btnSettings" title="Settings" aria-label="Settings">⚙️</button>
+  </div>
+</header>
+
+<!-- SETTINGS -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-handle"></div>
+    <div class="settings-title">⚙️ Settings</div>
+
+    <div class="settings-row">
+      <label class="settings-label" for="ollamaEndpoint">Ollama Endpoint</label>
+      <input type="text" class="settings-input" id="ollamaEndpoint" placeholder="http://localhost:11434" />
+    </div>
+
+    <div class="settings-row">
+      <label class="settings-label" for="ollamaModel">Ollama Model</label>
+      <input type="text" class="settings-input" id="ollamaModel" placeholder="gemma3:4b" />
+      <div style="font-size: .75rem; color: var(--clr-text-3); margin-top: 4px;">Default: <strong>gemma3:4b</strong> (or qwen3:0.6b)</div>
+    </div>
+
+    <div class="settings-row">
+      <label class="settings-label" for="voiceSelect">Avatar Voice</label>
+      <select class="settings-input" id="voiceSelect"><option value="">Loading voices...</option></select>
+    </div>
+
+    <button class="btn-save" id="btnSaveSettings">Save Settings</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- Pre-Session Welcome -->
+  <div class="presession-ui welcome-card">
+    <div style="font-size:3.2rem;margin-bottom:10px">👦🏻</div>
+    <div class="welcome-title">Hey! I'm Leo, your English Buddy</div>
+    <div class="welcome-sub">Let's have a casual daily conversation! Just press Start once — I will listen continuously so we can chat hands-free like real friends.</div>
+    <div class="feature-pills">
+      <div class="pill">⚡ Ultra Fast Replies</div>
+      <div class="pill">🔄 Hands-Free Continuous Mic</div>
+      <div class="pill">☕ Daily Casual Talk</div>
+      <div class="pill">🔒 100% Local (Ollama)</div>
+    </div>
+    <button class="btn-start" id="btnStartSession">🚀 Start Chatting with Leo</button>
+  </div>
+
+  <!-- AVATAR ZONE (Hand-Crafted Handsome Boy Character "Leo") -->
+  <div class="avatar-zone" id="avatarZone">
+    <div class="avatar-wrapper" id="avatarWrapper">
+      <div class="glow-ring"></div>
+
+      <!-- Modern Cool Boy SVG Avatar -->
+      <svg class="avatar-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#2c3e50"/>
+            <stop offset="100%" stop-color="#1a252f"/>
+          </linearGradient>
+          <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#fedac2"/>
+            <stop offset="100%" stop-color="#f8be9b"/>
+          </linearGradient>
+          <linearGradient id="hoodieGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#0284c7"/>
+          </linearGradient>
+          <linearGradient id="headphoneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#374151"/>
+            <stop offset="100%" stop-color="#1f2937"/>
+          </linearGradient>
+          <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.15"/>
+          </filter>
+        </defs>
+
+        <g class="boy-character" filter="url(#softShadow)">
+          <!-- Hoodie / Shoulders -->
+          <path d="M 45 168 Q 100 148 155 168 L 165 200 L 35 200 Z" fill="url(#hoodieGrad)"/>
+          <!-- Hoodie Collar & Strings -->
+          <path d="M 72 154 Q 100 178 128 154 Q 100 162 72 154 Z" fill="#1d4ed8"/>
+          <line x1="88" y1="162" x2="88" y2="182" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="112" y1="162" x2="112" y2="182" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+
+          <!-- Neck -->
+          <rect x="88" y="128" width="24" height="24" rx="4" fill="#f8be9b"/>
+
+          <!-- Head (Skin) -->
+          <path d="M 64 80 C 64 45 136 45 136 80 C 136 122 118 142 100 142 C 82 142 64 122 64 80 Z" fill="url(#skinGrad)"/>
+
+          <!-- Ears -->
+          <circle cx="62" cy="92" r="8" fill="#f8be9b"/>
+          <circle cx="138" cy="92" r="8" fill="#f8be9b"/>
+
+          <!-- Cool Gaming/Music Headphones -->
+          <!-- Band -->
+          <path d="M 52 90 C 52 32 148 32 148 90" fill="none" stroke="url(#headphoneGrad)" stroke-width="6" stroke-linecap="round"/>
+          <path d="M 52 90 C 52 32 148 32 148 90" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/>
+          <!-- Ear Cups -->
+          <rect x="46" y="80" width="12" height="24" rx="6" fill="#1e293b"/>
+          <circle cx="52" cy="92" r="4" fill="#3b82f6"/>
+          <rect x="142" y="80" width="12" height="24" rx="6" fill="#1e293b"/>
+          <circle cx="148" cy="92" r="4" fill="#3b82f6"/>
+
+          <!-- Stylish Boy Haircut (Layers) -->
+          <path d="M 58 74 C 54 44 82 30 102 30 C 128 30 148 42 142 74 C 136 55 125 48 108 48 C 90 48 72 58 58 74 Z" fill="url(#hairGrad)"/>
+          <!-- Front Bangs -->
+          <path d="M 66 60 Q 82 76 96 66 Q 112 80 134 60 C 128 50 115 45 98 45 C 80 45 70 52 66 60 Z" fill="url(#hairGrad)"/>
+
+          <!-- Eyebrows -->
+          <path d="M 74 76 Q 84 72 92 75" fill="none" stroke="#1e293b" stroke-width="2.8" stroke-linecap="round"/>
+          <path d="M 108 75 Q 116 72 126 76" fill="none" stroke="#1e293b" stroke-width="2.8" stroke-linecap="round"/>
+
+          <!-- Eyes -->
+          <!-- Left Eye -->
+          <g transform="translate(82, 86)">
+            <ellipse cx="0" cy="0" rx="7" ry="8" fill="#ffffff"/>
+            <ellipse class="eye-pupil" cx="0.5" cy="0" rx="4.5" ry="5.5" fill="#1e293b"/>
+            <circle cx="1.5" cy="-2" r="1.8" fill="#ffffff"/>
+            <circle cx="-1" cy="2" r="0.8" fill="#ffffff"/>
+            <!-- Eyelid for Blink -->
+            <rect class="eyelid" x="-8" y="-9" width="16" height="9" fill="#f8be9b"/>
+          </g>
+
+          <!-- Right Eye -->
+          <g transform="translate(118, 86)">
+            <ellipse cx="0" cy="0" rx="7" ry="8" fill="#ffffff"/>
+            <ellipse class="eye-pupil" cx="0.5" cy="0" rx="4.5" ry="5.5" fill="#1e293b"/>
+            <circle cx="1.5" cy="-2" r="1.8" fill="#ffffff"/>
+            <circle cx="-1" cy="2" r="0.8" fill="#ffffff"/>
+            <!-- Eyelid for Blink -->
+            <rect class="eyelid" x="-8" y="-9" width="16" height="9" fill="#f8be9b"/>
+          </g>
+
+          <!-- Nose -->
+          <path d="M 100 94 Q 102 102 98 103" fill="none" stroke="#e09f7a" stroke-width="2" stroke-linecap="round"/>
+
+          <!-- Friendly Smile / Animated Mouth -->
+          <path id="mouthPath" d="M 88 116 Q 100 126 112 116" fill="none" stroke="#991b1b" stroke-width="3.2" stroke-linecap="round"/>
+
+          <!-- Soft Cheek Blush -->
+          <ellipse cx="72" cy="98" rx="5" ry="3" fill="#f43f5e" opacity="0.25"/>
+          <ellipse cx="128" cy="98" rx="5" ry="3" fill="#f43f5e" opacity="0.25"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="avatar-status" id="avatarStatus">
+      <div class="status-dot"></div>
+      <span id="statusText">Ready to chat with you!</span>
+      <div class="thinking-spinner"></div>
+    </div>
+
+    <!-- Speech Bubble -->
+    <div class="avatar-bubble" id="avatarBubble"></div>
+  </div>
+
+  <!-- Live Transcript -->
+  <div class="transcript-zone session-ui" id="transcriptZone">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+      <div class="transcript-label">🎤 Listening to you...</div>
+      <div class="auto-mode-badge">● Hands-Free Loop Active</div>
+    </div>
+    <div class="transcript-text" id="transcriptText">
+      Speak anything naturally in English...
+    </div>
+  </div>
+
+  <!-- Conversation History -->
+  <div class="conversation-feed session-ui" id="conversationFeed"></div>
+
+</main>
+
+<!-- BOTTOM CONTROLS -->
+<div class="control-bar session-ui">
+  <button class="btn-end" id="btnEndSession">📊 Finish Chat</button>
+  <button class="btn-mic" id="btnMic" title="Microphone Active">
+    🎤
+  </button>
+</div>
+
+<!-- REPORT MODAL -->
+<div class="modal-overlay" id="feedbackModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.2rem">🌟 Practice Summary with Leo</div>
+      <div style="font-size:.82rem;color:var(--clr-text-2);margin-top:2px">Great job practicing daily conversation today!</div>
+    </div>
+    <div class="modal-body" id="feedbackBody"></div>
+    <div class="modal-footer">
+      <button class="btn-action" id="btnNewSession">🎙️ Talk Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  TALK WITH LEO — Fast Hands-Free Local English Companion
+// ═══════════════════════════════════════════════════════════
+
+let state = {
+  ollamaEndpoint: localStorage.getItem('leo_endpoint') || 'http://localhost:11434',
+  ollamaModel:    localStorage.getItem('leo_model')    || 'gemma3:4b',
+  voiceURI:       localStorage.getItem('leo_voice')    || '',
+  sessionActive:  false,
+  isListening:    false,
+  isSpeaking:     false,
+  isProcessing:   false,
+  sessionStartTime: null,
+  timerInterval:  null,
+  recognition:    null,
+  voices:         [],
+  conversationLog:[],
+  currentTranscript: '',
+  silenceTimer:   null
+};
+
+const el = {
+  body:            document.body,
+  btnSettings:     document.getElementById('btnSettings'),
+  settingsOverlay: document.getElementById('settingsOverlay'),
+  ollamaEndpoint:  document.getElementById('ollamaEndpoint'),
+  ollamaModel:     document.getElementById('ollamaModel'),
+  voiceSelect:     document.getElementById('voiceSelect'),
+  btnSaveSettings: document.getElementById('btnSaveSettings'),
+  sessionTimer:    document.getElementById('sessionTimer'),
+  avatarWrapper:   document.getElementById('avatarWrapper'),
+  avatarStatus:    document.getElementById('avatarStatus'),
+  statusText:      document.getElementById('statusText'),
+  avatarBubble:    document.getElementById('avatarBubble'),
+  transcriptText:  document.getElementById('transcriptText'),
+  convFeed:        document.getElementById('conversationFeed'),
+  btnStartSession: document.getElementById('btnStartSession'),
+  btnMic:          document.getElementById('btnMic'),
+  btnEndSession:   document.getElementById('btnEndSession'),
+  feedbackModal:   document.getElementById('feedbackModal'),
+  feedbackBody:    document.getElementById('feedbackBody'),
+  btnNewSession:   document.getElementById('btnNewSession'),
+  mouthPath:       document.getElementById('mouthPath'),
+  toastContainer:  document.getElementById('toastContainer')
+};
+
+// ── INIT ───────────────────────────────────────────────────
+function init() {
+  el.ollamaEndpoint.value = state.ollamaEndpoint;
+  el.ollamaModel.value    = state.ollamaModel;
+  initVoices();
+  bindEvents();
+}
+
+function initVoices() {
+  const load = () => {
+    state.voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+    el.voiceSelect.innerHTML = state.voices.map(v => 
+      `<option value="${v.voiceURI}" ${v.voiceURI === state.voiceURI ? 'selected':''}>${v.name} (${v.lang})</option>`
+    ).join('');
+  };
+  load();
+  speechSynthesis.onvoiceschanged = load;
+}
+
+function bindEvents() {
+  el.btnSettings.onclick     = () => el.settingsOverlay.classList.toggle('open');
+  el.settingsOverlay.onclick = e => { if (e.target === el.settingsOverlay) el.settingsOverlay.classList.remove('open'); };
+  el.btnSaveSettings.onclick = saveSettings;
+  el.btnStartSession.onclick = startSession;
+  el.btnMic.onclick          = toggleMic;
+  el.btnEndSession.onclick   = endSession;
+  el.btnNewSession.onclick   = restartSession;
+}
+
+function saveSettings() {
+  state.ollamaEndpoint = el.ollamaEndpoint.value.trim() || 'http://localhost:11434';
+  state.ollamaModel    = el.ollamaModel.value.trim()    || 'gemma3:4b';
+  state.voiceURI       = el.voiceSelect.value;
+  localStorage.setItem('leo_endpoint', state.ollamaEndpoint);
+  localStorage.setItem('leo_model',    state.ollamaModel);
+  localStorage.setItem('leo_voice',    state.voiceURI);
+  el.settingsOverlay.classList.remove('open');
+  toast('✅ Settings saved with ' + state.ollamaModel);
+}
+
+// ── SESSION START & AUTO CONTINUOUS LOOP ──────────────────
+const GREETINGS = [
+  "Hey! I'm Leo. What's something fun you did today?",
+  "Yo! Good to see you. What kind of music or movies do you like?",
+  "Hey friend! If you could travel anywhere right now, where would you go?",
+  "Hey! What's your favorite food or snack to eat?",
+  "Hey there! What are you planning to do this weekend?",
+  "Yo! Are you a morning person or a night owl?"
+];
+
+// Rolling chat memory sent to Ollama
+let chatHistory = [];
+
+function startSession() {
+  state.sessionActive = true;
+  state.sessionStartTime = Date.now();
+  state.conversationLog = [];
+  chatHistory = [];
+  el.body.classList.add('session-active');
+  startTimer();
+
+  const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+  chatHistory.push({ speaker: 'Leo', text: greeting });
+
+  setAvatarState('speaking');
+  showBubble(greeting);
+  speakText(greeting, () => {
+    // Hands-free: Automatically begin listening after greeting!
+    startListening();
+  });
+}
+
+function startTimer() {
+  el.sessionTimer.classList.add('active');
+  state.timerInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - state.sessionStartTime) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    el.sessionTimer.textContent = `${mm}:${ss}`;
+  }, 1000);
+}
+
+let lastLeoReply = '';
+
+// ── SPEECH RECOGNITION (HANDS-FREE CONTINUOUS) ────────────
+function toggleMic() {
+  if (state.isListening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
+
+function startListening() {
+  // Never listen while Leo is speaking or while processing!
+  if (!state.sessionActive || state.isSpeaking || state.isProcessing) return;
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    toast('⚠️ Please use Google Chrome or Edge for microphone support.');
+    return;
+  }
+
+  stopListening();
+
+  state.recognition = new SR();
+  state.recognition.lang = 'en-US';
+  state.recognition.continuous = true;
+  state.recognition.interimResults = true;
+
+  state.recognition.onstart = () => {
+    state.isListening = true;
+    el.btnMic.classList.add('listening');
+    el.btnMic.innerHTML = '🔴';
+    setAvatarState('listening');
+    el.transcriptText.classList.add('active');
+    el.transcriptText.innerHTML = 'Listening to you... <span class="cursor-blink"></span>';
+    state.currentTranscript = '';
+  };
+
+  state.recognition.onresult = (e) => {
+    // If Leo started speaking, drop this immediately
+    if (state.isSpeaking || state.isProcessing) return;
+
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const text = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += text;
+      else interim += text;
+    }
+    const current = (final || interim).trim();
+    if (!current) return;
+
+    // ECHO PROTECTION: If the mic picked up Leo's own voice through speakers, ignore it!
+    if (lastLeoReply && (
+        lastLeoReply.toLowerCase().includes(current.toLowerCase()) || 
+        current.toLowerCase().includes(lastLeoReply.toLowerCase()) ||
+        similarity(current, lastLeoReply) > 0.6
+    )) {
+      console.log('Filtered speaker echo:', current);
+      return;
+    }
+
+    state.currentTranscript = current;
+    el.transcriptText.innerHTML = `"${current}" <span class="cursor-blink"></span>`;
+
+    // Smart silence detector: 1.1s of silence after speech -> auto send!
+    clearTimeout(state.silenceTimer);
+    if (current.length > 1) {
+      state.silenceTimer = setTimeout(() => {
+        if (state.currentTranscript.trim() && !state.isSpeaking && !state.isProcessing) {
+          sendToLeo(state.currentTranscript.trim());
+        }
+      }, 1100);
+    }
+  };
+
+  // Simple similarity check to catch echoes
+  function similarity(s1, s2) {
+    const w1 = s1.toLowerCase().split(/\s+/);
+    const w2 = s2.toLowerCase().split(/\s+/);
+    const matches = w1.filter(w => w.length > 2 && w2.includes(w));
+    return matches.length / Math.max(w1.length, 1);
+  }
+
+  state.recognition.onerror = (e) => {
+    console.warn('Recognition notice:', e.error);
+    if (e.error === 'not-allowed') {
+      toast('❌ Microphone permission denied. Please allow mic in browser.');
+      stopListening();
+    }
+  };
+
+  state.recognition.onend = () => {
+    // If session is active and we are not speaking/processing, restart listening
+    if (state.sessionActive && !state.isSpeaking && !state.isProcessing && state.isListening) {
+      try { state.recognition.start(); } catch(e){}
+    }
+  };
+
+  try {
+    state.recognition.start();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function stopListening() {
+  state.isListening = false;
+  clearTimeout(state.silenceTimer);
+  if (state.recognition) {
+    try { state.recognition.stop(); } catch(e){}
+  }
+  el.btnMic.classList.remove('listening');
+  el.btnMic.innerHTML = '🎤';
+  if (!state.isSpeaking && !state.isProcessing) {
+    setAvatarState('idle');
+  }
+}
+
+// ── ULTRA-FAST OLLAMA CHAT WITH DYNAMIC MEMORY ───────────
+async function sendToLeo(userText) {
+  if (!userText.trim() || state.isProcessing || state.isSpeaking) return;
+  state.isProcessing = true;
+  stopListening();
+  clearTimeout(state.silenceTimer);
+
+  setAvatarState('thinking');
+  el.transcriptText.textContent = `"${userText}"`;
+
+  try {
+    const aiData = await callOllamaChat(userText);
+    lastLeoReply = aiData.reply; // Track to prevent mic from hearing it
+    state.conversationLog.push({ user: userText, ...aiData });
+    renderConversationCard(userText, aiData);
+
+    // Speak response then wait 500ms before safely listening again!
+    showBubble(aiData.reply);
+    await speakText(aiData.reply, () => {
+      state.isProcessing = false;
+      if (state.sessionActive) {
+        // Safe cooldown buffer so mic doesn't catch speaker tail echo
+        setTimeout(() => {
+          if (state.sessionActive && !state.isSpeaking) {
+            startListening();
+          }
+        }, 500);
+      }
+    });
+
+  } catch(err) {
+    console.error(err);
+    toast('⚠️ Ollama: ' + err.message);
+    state.isProcessing = false;
+    setAvatarState('idle');
+    setTimeout(() => { if (state.sessionActive) startListening(); }, 1500);
+  }
+}
+
+// ── HIGH-QUALITY FEW-SHOT GEMMA3 GENERATION ───────────────
+async function callOllamaChat(userText) {
+  let prompt = "You are Leo, a cool guy having a natural daily English conversation with your friend (the user).\n";
+  prompt += "Talk naturally like two friends chatting (warm, authentic, man-to-man English).\n\n";
+
+  // Concrete few-shot examples so model never copies placeholder brackets
+  prompt += "Example 1:\n";
+  prompt += "User: I went to the cinema yesterday.\n";
+  prompt += "REPLY: Oh awesome! What movie did you see? Was it action or comedy?\n";
+  prompt += "FIX: NONE\n";
+  prompt += "TIP: NONE\n\n";
+
+  prompt += "Example 2:\n";
+  prompt += "User: I go to market and buyed apples.\n";
+  prompt += "REPLY: Nice, fresh apples are great! What's your favorite fruit to eat?\n";
+  prompt += "FIX: I went to the market and bought apples.\n";
+  prompt += "TIP: Use \"went\" and \"bought\" for actions in the past.\n\n";
+
+  // Rolling conversation memory
+  chatHistory.slice(-4).forEach(h => {
+    prompt += `${h.speaker}: ${h.text}\n`;
+  });
+
+  prompt += `User: ${userText}\nREPLY:`;
+
+  const res = await fetch(`${state.ollamaEndpoint}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: state.ollamaModel,
+      prompt: prompt,
+      stream: false,
+      options: {
+        temperature: 0.7,
+        top_p: 0.9,
+        stop: ["\nUser:", "User:"]
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${txt.slice(0, 80)}`);
+  }
+
+  const data = await res.json();
+  let raw = data?.response || '';
+
+  // Clean and parse
+  let reply = raw;
+  let fix = null;
+  let tip = null;
+
+  if (raw.includes('FIX:')) {
+    const parts = raw.split(/FIX:/i);
+    reply = parts[0].trim();
+    if (parts[1]) {
+      const tipParts = parts[1].split(/TIP:/i);
+      const fixText = tipParts[0].trim();
+      if (fixText && !fixText.toUpperCase().includes('NONE')) {
+        fix = fixText;
+      }
+      if (tipParts[1]) {
+        const tipText = tipParts[1].trim();
+        if (tipText && !tipText.toUpperCase().includes('NONE')) {
+          tip = tipText;
+        }
+      }
+    }
+  }
+
+  // Sanitize any template brackets if the model ever generated one
+  reply = reply.replace(/<[^>]*>/g, '').replace(/^(REPLY:|Leo:|Assistant:)/i, '').trim();
+
+  if (!reply || reply.length < 5) {
+    reply = "That sounds interesting man! Tell me more about that, what happened?";
+  }
+
+  // Backup basic grammar checks
+  const lower = userText.toLowerCase().trim();
+  if (!fix && /\b(i buyed|i did not went|i eat yesterday|he go\b|she go\b|i went to market)\b/i.test(lower)) {
+    if (lower.includes('i buyed')) { fix = userText.replace(/buyed/gi, 'bought'); tip = 'Use "bought" as the past tense of "buy".'; }
+    else if (lower.includes('i did not went')) { fix = userText.replace(/did not went/gi, 'did not go'); tip = 'After "did not", use the base form of the verb ("go").'; }
+    else if (lower.includes('he go')) { fix = userText.replace(/he go/gi, 'he goes'); tip = 'Use "goes" for third-person singular (he/she/it).'; }
+    else if (lower.includes('she go')) { fix = userText.replace(/she go/gi, 'she goes'); tip = 'Use "goes" for third-person singular (he/she/it).'; }
+    else if (lower.includes('i went to market')) { fix = userText.replace(/to market/gi, 'to the market'); tip = 'Use "the market" when referring to a specific place.'; }
+  }
+
+  // Save into conversation memory
+  chatHistory.push({ speaker: 'User', text: userText });
+  chatHistory.push({ speaker: 'Leo', text: reply });
+  if (chatHistory.length > 8) chatHistory = chatHistory.slice(-8);
+
+  return { reply, fix, tip };
+}
+
+// ── RENDER CONVERSATION ────────────────────────────────────
+function renderConversationCard(userText, aiData) {
+  const card = document.createElement('div');
+  card.className = 'msg-card';
+  const time = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+  const fixHtml = aiData.fix ? `
+    <div class="correction-box">
+      <div style="font-weight:700;font-size:.82rem;margin-bottom:2px;display:flex;align-items:center;gap:4px;">
+        💡 <span>Better / Native way:</span>
+      </div>
+      <div style="color:hsl(152,69%,20%);font-weight:600;margin-bottom:4px;">"${escHtml(aiData.fix)}"</div>
+      ${aiData.tip ? `<div style="font-size:.78rem;color:hsl(152,60%,35%);">📝 <em>${escHtml(aiData.tip)}</em></div>` : ''}
+    </div>
+  ` : '';
+
+  card.innerHTML = `
+    <div class="msg-header">
+      <div class="msg-badge" style="background:var(--clr-primary-l)">🧑</div>
+      <div class="msg-name">You</div>
+      <div class="msg-time">${time}</div>
+    </div>
+    <div class="msg-body">
+      <div class="msg-user-text">"${escHtml(userText)}"</div>
+      ${fixHtml}
+    </div>
+    <div class="msg-header" style="background:hsl(217,91%,98%)">
+      <div class="msg-badge" style="background:#dbeafe">👦🏻</div>
+      <div class="msg-name" style="color:var(--clr-primary-d)">Leo</div>
+    </div>
+    <div class="msg-body">
+      <div class="leo-card">
+        ${escHtml(aiData.reply)}
+      </div>
+    </div>
+  `;
+  el.convFeed.appendChild(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+// ── TTS & MOUTH SYNC ───────────────────────────────────────
+let mouthInterval = null;
+function speakText(text, onComplete) {
+  return new Promise(resolve => {
+    speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-US';
+    utt.rate = 1.0;
+    utt.pitch = 1.15; // Friendly youthful pitch for Leo
+
+    const voice = state.voices.find(v => v.voiceURI === state.voiceURI);
+    if (voice) utt.voice = voice;
+
+    state.isSpeaking = true;
+    setAvatarState('speaking');
+    startMouth();
+
+    const finish = () => {
+      state.isSpeaking = false;
+      stopMouth();
+      if (onComplete) onComplete();
+      resolve();
+    };
+
+    utt.onend = finish;
+    utt.onerror = finish;
+    speechSynthesis.speak(utt);
+  });
+}
+
+function startMouth() {
+  let open = false;
+  mouthInterval = setInterval(() => {
+    open = !open;
+    if (open) {
+      el.mouthPath.setAttribute('d', 'M 88 114 Q 100 130 112 114');
+    } else {
+      el.mouthPath.setAttribute('d', 'M 88 116 Q 100 120 112 116');
+    }
+  }, 160);
+}
+
+function stopMouth() {
+  clearInterval(mouthInterval);
+  el.mouthPath.setAttribute('d', 'M 88 116 Q 100 126 112 116');
+}
+
+// ── AVATAR STATE ───────────────────────────────────────────
+function setAvatarState(st) {
+  el.avatarWrapper.className = 'avatar-wrapper';
+  el.avatarStatus.className  = 'avatar-status';
+
+  const labels = {
+    idle:      'Ready to chat',
+    listening: 'Listening... (hands-free)',
+    thinking:  'Leo is thinking...',
+    speaking:  'Leo is speaking...'
+  };
+
+  if (st !== 'idle') {
+    el.avatarWrapper.classList.add(`state-${st}`);
+    el.avatarStatus.classList.add(`state-${st}`);
+  }
+  el.statusText.textContent = labels[st] || '';
+}
+
+function showBubble(txt) {
+  el.avatarBubble.textContent = txt;
+  el.avatarBubble.classList.add('visible');
+  clearTimeout(showBubble._t);
+  showBubble._t = setTimeout(() => el.avatarBubble.classList.remove('visible'), 7000);
+}
+
+// ── END SESSION & FEEDBACK REPORT ──────────────────────────
+function endSession() {
+  state.sessionActive = false;
+  stopListening();
+  clearInterval(state.timerInterval);
+  speechSynthesis.cancel();
+  el.sessionTimer.classList.remove('active');
+  setAvatarState('idle');
+
+  const total = state.conversationLog.length;
+  const corrections = state.conversationLog.filter(c => c.fix);
+  const accuracy = total > 0 ? Math.round(((total - corrections.length) / total) * 100) : 100;
+
+  // Build list of corrections
+  const correctionItems = corrections.map((c, i) => `
+    <div style="background:var(--clr-surface);border:1px solid var(--clr-border);border-radius:12px;padding:12px;margin-bottom:8px;">
+      <div style="font-size:.8rem;color:var(--clr-red);margin-bottom:4px;">❌ <em>"${escHtml(c.user)}"</em></div>
+      <div style="font-size:.85rem;color:var(--clr-green);font-weight:700;margin-bottom:3px;">✅ "${escHtml(c.fix)}"</div>
+      ${c.tip ? `<div style="font-size:.78rem;color:var(--clr-text-2)">💡 ${escHtml(c.tip)}</div>` : ''}
+    </div>
+  `).join('');
+
+  el.feedbackBody.innerHTML = `
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:2.8rem;margin-bottom:4px;">🎯</div>
+      <div style="font-weight:800;font-size:1.15rem">Session Feedback & Score</div>
+      <div style="color:var(--clr-text-2);font-size:.85rem">Real-time breakdown of your conversation with Leo</div>
+    </div>
+
+    <!-- Accuracy & Stats -->
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <div style="flex:1;background:var(--clr-surface2);padding:12px;border-radius:12px;text-align:center;">
+        <div style="font-weight:800;font-size:1.3rem;color:var(--clr-primary-d)">${total}</div>
+        <div style="font-size:.72rem;color:var(--clr-text-2);font-weight:700;text-transform:uppercase;">Sentences</div>
+      </div>
+      <div style="flex:1;background:var(--clr-green-l);padding:12px;border-radius:12px;text-align:center;">
+        <div style="font-weight:800;font-size:1.3rem;color:var(--clr-green)">${accuracy}%</div>
+        <div style="font-size:.72rem;color:var(--clr-green);font-weight:700;text-transform:uppercase;">Fluency Score</div>
+      </div>
+      <div style="flex:1;background:var(--clr-red-l);padding:12px;border-radius:12px;text-align:center;">
+        <div style="font-weight:800;font-size:1.3rem;color:var(--clr-red)">${corrections.length}</div>
+        <div style="font-size:.72rem;color:var(--clr-red);font-weight:700;text-transform:uppercase;">Fixed Errors</div>
+      </div>
+    </div>
+
+    <!-- Corrections Section -->
+    ${corrections.length > 0 ? `
+      <div style="font-weight:800;font-size:.88rem;color:var(--clr-text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">
+        📝 Corrections to Practice:
+      </div>
+      <div style="max-height:180px;overflow-y:auto;margin-bottom:16px;">
+        ${correctionItems}
+      </div>
+    ` : `
+      <div style="background:var(--clr-green-l);border:1px solid hsl(152,69%,80%);padding:14px;border-radius:12px;text-align:center;color:hsl(152,69%,25%);font-weight:600;font-size:.9rem;margin-bottom:14px;">
+        🌟 Fantastic job! All your sentences were spoken clearly and accurately!
+      </div>
+    `}
+
+    <div style="background:hsl(217,91%,96%);padding:14px;border-radius:12px;font-size:.85rem;color:hsl(217,91%,30%);line-height:1.5;">
+      💪 <strong>Leo's Advice:</strong> The key to mastering English is daily spoken practice. You did great today—keep conversing every day!
+    </div>
+  `;
+
+  el.feedbackModal.classList.add('open');
+}
+
+function restartSession() {
+  el.feedbackModal.classList.remove('open');
+  el.convFeed.innerHTML = '';
+  el.transcriptText.textContent = 'Speak anything naturally in English...';
+  el.sessionTimer.textContent = '00:00';
+  startSession();
+}
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  el.toastContainer.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>
