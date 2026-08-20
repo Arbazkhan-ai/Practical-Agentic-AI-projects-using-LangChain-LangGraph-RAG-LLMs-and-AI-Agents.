@@ -69,9 +69,14 @@ def fetch_world_bank_data(
             project_id=project_id,
             title=f"{ind_name} — World Bank",
             url=url,
-            publisher="World Bank",
+            publisher="World Bank Group",
             source_type="api",
-            tier=2,
+            tier=1,
+            institution_category="Multilateral Financial Institution",
+            document_type="statistical_api",
+            content_format="api_json",
+            publication_date=f"{end_year}-01-01",
+            page_count=None,
             language="en",
             domain="data.worldbank.org"
         )

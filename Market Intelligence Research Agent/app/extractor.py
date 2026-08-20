@@ -1,7 +1,7 @@
 """
 AI Evidence Extractor:
 Processes ingested text in balanced chunks and extracts strictly grounded factual findings,
-metrics, numeric values, and verbatim quotes.
+metrics, numeric values, denominator definitions, and verbatim quotes.
 """
 
 import uuid
@@ -14,24 +14,27 @@ EXTRACTOR_SYSTEM_PROMPT = """You are a meticulous research evidence extractor fo
 
 Absolute rules:
 - NEVER invent, infer, estimate, or generalize. If the text does not state it, do not output it.
-- Every finding MUST include a verbatim quote copied word-for-word from the SOURCE CONTENT that directly supports the claim. If you cannot supply a supporting verbatim quote, do not output the finding.
-- Use the research plan context only to judge relevance. NEVER take any value, number, or fact from the plan context.
-- Prefer findings that carry a metric/number, a geography (market/country), and a time period when the text provides them.
+- Every finding MUST include a verbatim quote copied word-for-word from the SOURCE CONTENT that directly supports the claim.
+- Tag each extraction strictly as "sourced_fact". (Derived calculations are computed by Eclectik's deterministic engine separately).
+- Preserves the exact denominator or measurement definition (e.g. "% of hotel food & beverage spend", "% of total merchandise imports", "commercial gross sales in JMD", "visitor spend per day in USD").
+- Extract the exact location (page number, table number, cuadro, section) whenever discernible.
 - If the text contains no qualifying findings, return an empty findings array.
 
 Return ONLY a valid JSON object (no prose, no markdown) with exactly this shape:
 {
   "findings": [
     {
-      "claim": "one-sentence factual statement grounded in the quote",
+      "claim": "one-sentence factual statement grounded strictly in the quote",
+      "claim_type": "sourced_fact",
       "metric": "name of the measure or null",
       "value": 12.34,  // numeric value only or null
-      "unit": "US$ / % / arrivals or null",
+      "unit": "US$ / % / arrivals / JMD or null",
+      "denominator_definition": "precise base/denominator or null",
       "market": "Country/market name or null",
-      "period": "Year or range or null",
+      "period": "Exact observation year or range (e.g., 2023, 2018-2024) or null",
       "confidence": "high" | "medium" | "low",
       "quote": "verbatim excerpt copied from SOURCE CONTENT",
-      "location_hint": "section or heading if identifiable, else null"
+      "location_hint": "e.g. Page 52, Cuadro 4.3 or Section 2 or null"
     }
   ]
 }
@@ -76,6 +79,9 @@ def extract_findings_from_sources(
         src_title = src.title if src else "Untitled"
         src_url = src.url if src else "N/A"
         src_pub = src.publisher if src else "Unknown"
+        src_tier = src.tier if src else 5
+        src_doc_type = src.document_type if src else "web_article"
+        src_pub_date = src.publication_date if src else None
 
         # Split text into chunks
         text_chunks = [
@@ -93,7 +99,8 @@ def extract_findings_from_sources(
 
 SOURCE METADATA:
 Title: {src_title}
-Publisher: {src_pub}
+Publisher: {src_pub} (Tier {src_tier})
+Document Type: {src_doc_type}
 URL: {src_url}
 Chunk: {idx + 1} of {len(text_chunks)}
 
@@ -130,19 +137,26 @@ SOURCE CONTENT (extract findings ONLY from the text below):
                         run_id=run_id,
                         project_id=project_id,
                         source_id=content_rec.source_id,
+                        claim_type=item.get("claim_type", "sourced_fact"),
                         claim=claim,
                         metric=item.get("metric"),
                         value=numeric_val,
                         unit=item.get("unit"),
+                        denominator_definition=item.get("denominator_definition"),
                         geography=item.get("market"),
                         time_period=item.get("period"),
                         confidence=item.get("confidence", "medium"),
                         evidence_text=quote,
-                        page_section=item.get("location_hint"),
-                        citation_url=src_url
+                        page_section=item.get("location_hint") or content_rec.extracted_page,
+                        citation_url=src_url,
+                        source_tier=src_tier,
+                        source_publisher=src_pub,
+                        document_type=src_doc_type,
+                        publication_date=src_pub_date
                     )
                     all_findings.append(finding)
             except Exception:
                 continue
 
     return all_findings
+

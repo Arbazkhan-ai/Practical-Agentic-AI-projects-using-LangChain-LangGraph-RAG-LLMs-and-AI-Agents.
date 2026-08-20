@@ -1,7 +1,7 @@
 """
 Search Engine & Web Content Ingestion:
 Executes queries via Firecrawl API or DuckDuckGo fallback, matches domain registry,
-and extracts clean markdown/text from target web pages and PDFs.
+and extracts clean markdown/text from target web pages and PDFs with rigorous metadata validation.
 """
 
 import os
@@ -33,12 +33,20 @@ def extract_host(url: str) -> Optional[str]:
         return None
 
 
-def match_registry_domain(host: str) -> Tuple[Optional[str], int, str]:
+def match_registry_domain(host: str, url: str = "") -> Tuple[Optional[str], int, str, str, str]:
     """
-    Matches host against SOURCE_REGISTRY to determine publisher name, tier, and region type.
+    Matches host against SOURCE_REGISTRY to determine publisher name, tier (1-6),
+    institution category, document type, and source type.
     """
+    is_pdf = bool(url and ".pdf" in url.lower())
     if not host:
-        return None, 5, "web"
+        return None, 5, "General Web", ("institutional_pdf" if is_pdf else "web_article"), "web"
+
+    # Social media domains explicitly classified as Tier 6
+    social_domains = {"twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com", "reddit.com", "tiktok.com"}
+    for sd in social_domains:
+        if host == sd or host.endswith("." + sd):
+            return host, 6, "Social Media", "social_media", "social"
 
     best_match = None
     for r in SOURCE_REGISTRY:
@@ -48,18 +56,18 @@ def match_registry_domain(host: str) -> Tuple[Optional[str], int, str]:
                 best_match = r
 
     if best_match:
-        region = best_match.get("region", "web")
-        if region == "regional":
-            source_type = "regional"
-        elif region == "international":
-            source_type = "intl"
-        elif region in ("french_caribbean", "national"):
-            source_type = "gov"
-        else:
-            source_type = "web"
-        return best_match.get("name"), best_match.get("tier", 1), source_type
+        tier = best_match.get("tier", 2)
+        category = best_match.get("institution_category", "Institutional")
+        doc_type = best_match.get("document_type", "institutional_pdf" if is_pdf else "web_article")
+        if is_pdf and "pdf" not in doc_type:
+            doc_type = f"{doc_type}_pdf"
+        elif not is_pdf and "pdf" in doc_type:
+            doc_type = "web_portal"
+        return best_match.get("name"), tier, category, doc_type, "institutional"
 
-    return host, 5, "web"
+    # General Web default
+    doc_type = "institutional_pdf" if is_pdf else "web_article"
+    return host, 5, "General Web", doc_type, "web"
 
 
 def build_search_strategy(plan: ResearchPlan, run_id: str, project_id: str) -> List[Dict[str, Any]]:
@@ -170,6 +178,28 @@ def scrape_url_content(url: str, timeout: int = 15) -> Tuple[bool, str, str]:
         return False, "", str(e)
 
 
+def extract_publication_date_hint(text: str, url: str) -> Optional[str]:
+    """Extracts plausible publication date (YYYY-MM-DD or YYYY-MM) from text or URL."""
+    # Check URL for date patterns like /2023/11/ or 2023-11-25
+    url_match = re.search(r"\b(201\d|202\d)[/-](0[1-9]|1[0-2])(?:[/-](0[1-9]|[12]\d|3[01]))?\b", url)
+    if url_match:
+        parts = [p for p in url_match.groups() if p]
+        return "-".join(parts)
+
+    # Check text for publication dates
+    text_sample = text[:2000] if text else ""
+    date_match = re.search(r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(201\d|202\d)\b", text_sample, re.IGNORECASE)
+    if date_match:
+        month_map = {
+            "january": "01", "february": "02", "march": "03", "april": "04", "may": "05", "june": "06",
+            "july": "07", "august": "08", "september": "09", "october": "10", "november": "11", "december": "12"
+        }
+        m_str = month_map.get(date_match.group(1).lower(), "01")
+        return f"{date_match.group(2)}-{m_str}"
+
+    return None
+
+
 def execute_search_and_scrape(
     queries: List[Dict[str, Any]],
     run_id: str,
@@ -178,7 +208,8 @@ def execute_search_and_scrape(
     max_scrape_targets: int = 15
 ) -> Tuple[List[SourceRecord], List[SourceContentRecord]]:
     """
-    Executes search over prioritized queries, deduplicates domains, and scrapes top target sources.
+    Executes search over prioritized queries, deduplicates domains, and scrapes top target sources
+    with accurate metadata attribution and no synthetic default page counts on HTML sources.
     """
     seen_urls = set()
     sources: List[SourceRecord] = []
@@ -193,7 +224,8 @@ def execute_search_and_scrape(
             seen_urls.add(url)
 
             host = extract_host(url)
-            publisher, tier, source_type = match_registry_domain(host)
+            publisher, tier, category, doc_type, source_type = match_registry_domain(host, url=url)
+            is_pdf = bool(url and ".pdf" in url.lower())
 
             src_rec = SourceRecord(
                 id=str(uuid.uuid4()),
@@ -204,6 +236,11 @@ def execute_search_and_scrape(
                 publisher=publisher,
                 source_type=source_type,
                 tier=tier,
+                institution_category=category,
+                document_type=doc_type,
+                publication_date=None, # will be updated from scraped content
+                page_count=None, # strictly null for web; estimated only if PDF metadata available
+                content_format="pdf" if is_pdf else "html",
                 language=q.get("language", "en"),
                 domain=host
             )
@@ -211,7 +248,7 @@ def execute_search_and_scrape(
 
     # Sort sources: Tier 1 authoritative first, PDFs prioritized
     def sort_key(s: SourceRecord):
-        is_pdf = 0 if ".pdf" in s.url.lower() else 1
+        is_pdf = 0 if s.content_format == "pdf" else 1
         return (s.tier, is_pdf)
 
     sources.sort(key=sort_key)
@@ -220,16 +257,24 @@ def execute_search_and_scrape(
     contents: List[SourceContentRecord] = []
     for src in targets:
         ok, text, err = scrape_url_content(src.url)
-        content_type = "pdf" if ".pdf" in src.url.lower() else "html"
+        content_format = "pdf" if ".pdf" in src.url.lower() else "html"
+        
+        # Extract publication date hint if available
+        if ok and text:
+            pub_date = extract_publication_date_hint(text, src.url)
+            if pub_date:
+                src.publication_date = pub_date
+
         contents.append(SourceContentRecord(
             source_id=src.id,
             run_id=run_id,
             project_id=project_id,
             content=text if ok else None,
             char_count=len(text) if text else 0,
-            content_type=content_type,
+            content_type=content_format,
             extract_ok=ok,
             extract_error=err if not ok else None
         ))
 
     return sources, contents
+

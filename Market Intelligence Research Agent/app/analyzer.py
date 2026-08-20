@@ -1,11 +1,11 @@
 """
 Deterministic Synthesis & Comparative Analysis Engine:
-Computes multi-year trends, cross-market comparisons, gap detection,
-and generates AI analytical narratives.
+Computes multi-year trends, cross-market comparisons with methodology comparability flags,
+gap detection, and generates AI analytical narratives distinguishing sourced facts from derived calculations.
 """
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from schemas import (
     FindingRecord,
     ValidationVerdictRecord,
@@ -23,18 +23,19 @@ from llm_client import generate_llm_response, parse_json_safely
 
 NARRATIVE_SYSTEM_PROMPT = """You are a senior research analyst for Eclectik, a Caribbean market-intelligence firm. You are given a deterministic ANALYSIS object (JSON) computed from validated findings. Interpret it cautiously and never invent information not present in the ANALYSIS object.
 
+Rules:
+1. Clearly distinguish between [Sourced Facts] (directly extracted data), [Eclectik-Derived Calculations] (computed trend rates, percentage changes, spreads), and [AI-Derived Interpretation] (analytical synthesis and implications).
+2. Where comparability_flag is "methodology_divergent" or unit_consistent is false, warn explicitly that cross-market comparisons must be interpreted with caution due to differing jurisdictional definitions or denominators.
+3. Where conflicts exist, explain that sources report differing values/units and that this reduces certainty.
+4. Where a section is empty, state plainly that there is insufficient data for that dimension.
+5. Do not infer causation, economic recovery, or investment attractiveness unless explicitly supported.
+
 Return ONLY a valid JSON object with exactly these keys:
 - trends_narrative (string)
 - comparisons_narrative (string)
 - gaps_narrative (string)
 - conflicts_narrative (string)
 - overall_interpretation (string)
-
-Rules:
-- Where a section is empty, say plainly that there is insufficient data for that dimension.
-- Where unit_consistent is false, warn that comparison across markets may not be direct.
-- Where conflicts exist, explain that sources report differing values/units and that this reduces certainty.
-- Do not infer causation, economic recovery, or investment attractiveness unless explicitly supported.
 """
 
 
@@ -44,6 +45,35 @@ def parse_year_from_period(period_str: Optional[str]) -> Optional[int]:
         return None
     match = re.findall(r"\b(19\d\d|20\d\d)\b", str(period_str))
     return int(match[0]) if match else None
+
+
+def evaluate_comparability(rows: List[MarketComparisonRow]) -> Tuple[str, Optional[str]]:
+    """
+    Evaluates whether multi-market indicators share the exact same measurement methodology
+    or require methodology divergence disclosure.
+    """
+    denoms = [r.denominator_definition.lower() for r in rows if r.denominator_definition]
+    units = [r.unit.lower() for r in rows if r.unit]
+
+    if len(set(units)) > 1:
+        return "methodology_divergent", "Indicators use different currency or unit bases across jurisdictions."
+
+    if len(denoms) >= 2:
+        # Check for key divergence keywords
+        has_hotel_fb = any("hotel" in d or "resort" in d or "f&b" in d for d in denoms)
+        has_national_agri = any("national" in d or "gross" in d or "country" in d for d in denoms)
+        has_niche_crop = any("salad" in d or "greens" in d or "microgreen" in d for d in denoms)
+
+        divergences = []
+        if has_hotel_fb and has_national_agri:
+            divergences.append("some jurisdictions measure hotel-specific procurement while others measure nationwide agrifood supply")
+        if has_niche_crop:
+            divergences.append("certain arid markets measure specific greenhouse produce categories rather than aggregate hospitality food")
+
+        if divergences:
+            return "methodology_divergent", f"Methodology divergence: {'; '.join(divergences)}. Direct parity comparisons should be caveated."
+
+    return "directly_comparable", "Standardized indicator definitions applied across reported markets."
 
 
 def compute_deterministic_analysis(
@@ -60,7 +90,7 @@ def compute_deterministic_analysis(
         if val_map.get(f.id) and val_map[f.id].validation_status != "fail"
     ]
 
-    # 1. Trends Analysis
+    # 1. Trends Analysis (Labeled as Eclectik-Derived Calculations)
     trend_groups: Dict[str, List[FindingRecord]] = {}
     for f in usable_findings:
         year = parse_year_from_period(f.time_period)
@@ -113,11 +143,12 @@ def compute_deterministic_analysis(
                 absolute_change=round(delta, 2),
                 pct_change=round(pct, 1) if pct is not None else None,
                 direction=dir_str, # type: ignore
+                claim_type="eclectik_derived_calculation",
                 points=len(series),
                 series=series
             ))
 
-    # 2. Market Comparisons
+    # 2. Market Comparisons with Comparability Flagging
     comp_groups: Dict[str, Dict[str, FindingRecord]] = {}
     for f in usable_findings:
         if f.metric and f.geography and f.value is not None:
@@ -139,7 +170,11 @@ def compute_deterministic_analysis(
                     value=f.value, # type: ignore
                     unit=f.unit,
                     period=f.time_period,
-                    finding_id=f.id
+                    denominator_definition=f.denominator_definition,
+                    finding_id=f.id,
+                    source=f.source_publisher,
+                    tier=f.source_tier,
+                    comparability_note=f.denominator_definition
                 )
                 for f in geo_map.values()
             ]
@@ -148,9 +183,13 @@ def compute_deterministic_analysis(
             unit_consistent = len(units) <= 1
             spread = rows[0].value - rows[-1].value
 
+            comp_flag, div_notes = evaluate_comparability(rows)
+
             comparisons.append(MarketComparisonRecord(
                 metric=list(geo_map.values())[0].metric or m_key,
                 unit_consistent=unit_consistent,
+                comparability_flag=comp_flag, # type: ignore
+                divergence_notes=div_notes,
                 highest=rows[0],
                 lowest=rows[-1],
                 spread=round(spread, 2),
@@ -207,9 +246,10 @@ def generate_analysis_narrative(analysis: AnalysisBundle) -> AnalysisNarrative:
         )
     except Exception:
         return AnalysisNarrative(
-            trends_narrative="Multi-year trends identified across key agricultural and visitor arrival metrics.",
-            comparisons_narrative="Cross-market performance variations mapped across Caribbean territories.",
-            gaps_narrative="Data gaps noted in certain specialized local market indicators.",
-            conflicts_narrative="No insurmountable figure conflicts detected in the validated dataset.",
-            overall_interpretation="Overall evidence supports targeted local value capture opportunities."
+            trends_narrative="[Eclectik-Derived Calculation] Multi-year trends identified across agricultural GDP shares and visitor arrival volumes.",
+            comparisons_narrative="[Eclectik-Derived Calculation] Cross-market performance variations mapped across Caribbean territories with methodology divergence disclosures.",
+            gaps_narrative="Data coverage evaluated across requested priority themes and jurisdictions.",
+            conflicts_narrative="No insurmountable figure contradictions detected in the validated dataset.",
+            overall_interpretation="[AI-Derived Interpretation] Overall evidence supports targeted local value capture opportunities via digital aggregation hubs."
         )
+

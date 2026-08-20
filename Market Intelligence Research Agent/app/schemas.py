@@ -1,5 +1,7 @@
 """
 Pydantic schemas for the Research Intelligence Agent.
+Enforces rigorous source metadata, denominator preservation, 6-tier quality classification,
+and cross-market comparability flags.
 """
 
 from typing import List, Dict, Optional, Literal, Any
@@ -49,7 +51,18 @@ class SourceRecord(BaseModel):
     url: str
     publisher: Optional[str] = None
     source_type: str = "web"
-    tier: int = 5
+    tier: int = Field(default=5, description="Source tier from 1 (Multilateral) to 6 (Social/Informal)")
+    institution_category: Optional[str] = Field(
+        default="General Web",
+        description="Multilateral, National Statistical Office, Academic, Corporate Case Study, Trade Media, Social Media"
+    )
+    document_type: str = Field(
+        default="web_article",
+        description="institutional_pdf, national_bulletin, academic_study, corporate_case_study, statistical_api, web_article, social_media"
+    )
+    publication_date: Optional[str] = Field(default=None, description="Actual publication date (YYYY-MM-DD or YYYY-MM) or date_unspecified")
+    page_count: Optional[int] = Field(default=None, description="Document page count for PDFs only; null for HTML/web")
+    content_format: str = Field(default="html", description="pdf, html, api_json")
     language: Optional[str] = "en"
     domain: Optional[str] = None
 
@@ -63,18 +76,28 @@ class SourceContentRecord(BaseModel):
     content_type: str = "html"
     extract_ok: bool = True
     extract_error: Optional[str] = None
+    pdf_filename: Optional[str] = None
+    extracted_page: Optional[str] = None
 
 
 class FindingExtractionItem(BaseModel):
     claim: str = Field(description="One-sentence factual statement strictly grounded in text")
+    claim_type: Literal["sourced_fact", "eclectik_derived_calculation", "ai_interpretation"] = Field(
+        default="sourced_fact",
+        description="Distinguishes sourced facts from Eclectik-derived calculations and AI interpretation"
+    )
     metric: Optional[str] = Field(default=None, description="Name of the measure")
     value: Optional[float] = Field(default=None, description="Clean numeric value")
     unit: Optional[str] = Field(default=None, description="Unit or currency")
+    denominator_definition: Optional[str] = Field(
+        default=None,
+        description="Exact measurement base or denominator (e.g., % of hotel F&B spend, % of gross imports, daily spend/tourist)"
+    )
     market: Optional[str] = Field(default=None, description="Country/market")
-    period: Optional[str] = Field(default=None, description="Year or range")
+    period: Optional[str] = Field(default=None, description="Exact observation year or range (e.g., 2023, 2018-2024)")
     confidence: Literal["high", "medium", "low"] = Field(default="medium", description="Evidence confidence")
-    quote: str = Field(description="Verbatim excerpt from source text")
-    location_hint: Optional[str] = Field(default=None, description="Section or page")
+    quote: str = Field(description="Verbatim excerpt from source text preserving exact wording")
+    location_hint: Optional[str] = Field(default=None, description="Exact page, table, cuadro, or section (e.g. Page 52, Table 4.3)")
 
 
 class ExtractedFindingsResponse(BaseModel):
@@ -86,16 +109,22 @@ class FindingRecord(BaseModel):
     run_id: str
     project_id: str
     source_id: Optional[str] = None
+    claim_type: Literal["sourced_fact", "eclectik_derived_calculation", "ai_interpretation"] = "sourced_fact"
     claim: str
     metric: Optional[str] = None
     value: Optional[float] = None
     unit: Optional[str] = None
+    denominator_definition: Optional[str] = None
     geography: Optional[str] = None
     time_period: Optional[str] = None
     confidence: Optional[str] = None
     evidence_text: Optional[str] = None
     page_section: Optional[str] = None
     citation_url: Optional[str] = None
+    source_tier: Optional[int] = 5
+    source_publisher: Optional[str] = None
+    document_type: Optional[str] = None
+    publication_date: Optional[str] = None
 
 
 class ValidationVerdictRecord(BaseModel):
@@ -104,6 +133,11 @@ class ValidationVerdictRecord(BaseModel):
     project_id: str
     source_id: Optional[str] = None
     validation_status: Literal["pass", "warn", "fail"]
+    metadata_status: Literal["pass", "warn", "fail"] = "pass"
+    grounding_status: Literal["pass", "warn", "fail"] = "pass"
+    comparability_status: Literal["pass", "divergent_flagged"] = "pass"
+    denominator_preserved: bool = True
+    calculation_valid: Optional[bool] = None
     issue_codes: Optional[str] = None
     issues: Optional[str] = None
     support_score: Optional[float] = None
@@ -129,6 +163,7 @@ class TrendRecord(BaseModel):
     absolute_change: float
     pct_change: Optional[float] = None
     direction: Literal["increasing", "decreasing", "stable"]
+    claim_type: Literal["eclectik_derived_calculation"] = "eclectik_derived_calculation"
     points: int
     series: List[TimeSeriesPoint]
 
@@ -138,13 +173,18 @@ class MarketComparisonRow(BaseModel):
     value: float
     unit: Optional[str] = None
     period: Optional[str] = None
+    denominator_definition: Optional[str] = None
     finding_id: str
     source: Optional[str] = None
+    tier: Optional[int] = None
+    comparability_note: Optional[str] = None
 
 
 class MarketComparisonRecord(BaseModel):
     metric: str
     unit_consistent: bool
+    comparability_flag: Literal["directly_comparable", "methodology_divergent", "proxy_comparison", "not_directly_comparable"] = "directly_comparable"
+    divergence_notes: Optional[str] = None
     highest: MarketComparisonRow
     lowest: MarketComparisonRow
     spread: float
