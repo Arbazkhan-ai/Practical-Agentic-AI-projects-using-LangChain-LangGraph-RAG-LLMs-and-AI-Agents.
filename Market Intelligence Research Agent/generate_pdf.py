@@ -418,6 +418,8 @@ def build_pdf(filename):
     print(f"PDF successfully generated: {filename}")
 
 if __name__ == '__main__':
-    out_pdf = "e:/learning/Agentic ai/Agentic Ai Projects/Market Intelligence Research Agent/Eclectik_Research_Intelligence_Brief.pdf"
+    from pathlib import Path
+    out_pdf = str(Path(__file__).resolve().parent / "Eclectik_Research_Intelligence_Brief.pdf")
     build_pdf(out_pdf)
+
 

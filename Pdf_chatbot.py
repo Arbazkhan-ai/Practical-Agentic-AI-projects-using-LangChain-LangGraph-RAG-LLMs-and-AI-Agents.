@@ -1,117 +1,118 @@
+import sys
+import os
+from pathlib import Path
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import ChatOllama
 
-
-# =========================
-# 1. LLM
-# =========================
-
-llm = ChatOllama(
-    model="gemma3:4b"
-)
+# Ensure UTF-8 output on Windows consoles
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
-# =========================
-# 2. Embedding Model
-# =========================
+def resolve_pdf_path(target_path: str = None) -> Path:
+    """Finds the target PDF using explicit arguments, default paths, or workspace discovery."""
+    candidates = []
+    if target_path:
+        candidates.append(Path(target_path))
+    
+    # Common local search locations
+    base_dir = Path(__file__).resolve().parent
+    candidates.extend([
+        base_dir / "documents" / "Call_CV.pdf",
+        base_dir.parent / "documents" / "Call_CV.pdf",
+        base_dir / "Market Intelligence Research Agent" / "Eclectik_Research_Intelligence_Brief.pdf",
+        base_dir / "Call_CV.pdf"
+    ])
+    
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
 
-embedding = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+    # Search for any PDF in workspace
+    for found in base_dir.rglob("*.pdf"):
+        return found
 
-
-# =========================
-# 3. Load PDF
-# =========================
-
-loader = PyMuPDFLoader(
-    r"E:\learning\Agentic ai\documents\Call_CV.pdf"
-)
-
-documents = loader.load()
-
-
-# =========================
-# 4. Split Documents
-# =========================
-
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,
-    chunk_overlap=50
-)
-
-chunks = splitter.split_documents(documents)
-
-print("Number of chunks:", len(chunks))
+    return None
 
 
-# =========================
-# 5. Create ChromaDB
-# =========================
+def run_pdf_chatbot(pdf_path: str = None, user_query: str = None):
+    print("=" * 65)
+    print("📄 [PDF CHATBOT] RAG Pipeline with LangChain, Chroma & Ollama")
+    print("=" * 65)
 
-vectorstore = Chroma.from_documents(
-    documents=chunks,
-    embedding=embedding,
-    collection_name="my_cv"
-)
+    resolved_path = resolve_pdf_path(pdf_path)
+    if not resolved_path:
+        print("❌ Error: No PDF document found to index.")
+        print("Please provide a PDF file path as an argument: python Pdf_chatbot.py <path_to_pdf>")
+        return
 
-print("Documents stored in ChromaDB")
+    print(f"📖 Loading PDF: {resolved_path.name} ({resolved_path})")
 
+    # =========================
+    # 1. Embedding Model
+    # =========================
+    print("⏳ Initializing SentenceTransformers embeddings...")
+    embedding = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
 
-# =========================
-# 6. Create Retriever
-# =========================
+    # =========================
+    # 2. Load PDF & Split
+    # =========================
+    loader = PyMuPDFLoader(str(resolved_path))
+    documents = loader.load()
+    print(f"✅ Loaded {len(documents)} page(s) from document.")
 
-retriever = vectorstore.as_retriever(
-    search_kwargs={"k": 3}
-)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=50
+    )
+    chunks = splitter.split_documents(documents)
+    print(f"✂️ Created {len(chunks)} text chunk(s).")
 
+    # =========================
+    # 3. Create ChromaDB VectorStore
+    # =========================
+    collection_name = f"doc_{abs(hash(str(resolved_path))) % 100000}"
+    vectorstore = Chroma.from_documents(
+        documents=chunks,
+        embedding=embedding,
+        collection_name=collection_name
+    )
+    print("💾 Chunks successfully stored in ChromaDB vector store.")
 
-# =========================
-# 7. User Question
-# =========================
+    # =========================
+    # 4. Create Retriever
+    # =========================
+    retriever = vectorstore.as_retriever(
+        search_kwargs={"k": 3}
+    )
 
-query = "What work experience does Arbaz have?"
+    # =========================
+    # 5. User Question & Retrieval
+    # =========================
+    query = user_query or "What are the primary findings, experience, and key summary points in this document?"
+    print(f"\n❓ Question: {query}")
 
+    results = retriever.invoke(query)
+    print(f"\n🔎 Retrieved {len(results)} relevant context chunk(s):")
+    for i, doc in enumerate(results, 1):
+        print(f"--- Chunk {i} ---")
+        print(doc.page_content[:200] + ("..." if len(doc.page_content) > 200 else ""))
 
-# =========================
-# 8. Retrieve Relevant Chunks
-# =========================
+    context = "\n\n".join(doc.page_content for doc in results)
 
-results = retriever.invoke(query)
+    # =========================
+    # 6. LLM Generation
+    # =========================
+    prompt = f"""
+You are a helpful and precise assistant.
 
-print("\nRelevant chunks:\n")
-
-for i, doc in enumerate(results):
-    print(f"--- Chunk {i + 1} ---")
-    print(doc.page_content)
-
-
-# =========================
-# 9. Create Context
-# =========================
-
-context = "\n\n".join(
-    doc.page_content
-    for doc in results
-)
-
-
-# =========================
-# 10. Send Context + Question to LLM
-# =========================
-
-prompt = f"""
-You are a helpful assistant.
-
-Answer the question using ONLY the information
-provided in the context.
-
-If the answer is not available in the context,
-say "I don't know based on the provided document."
+Answer the question using ONLY the information provided in the context below.
+If the answer cannot be determined from the context, say "I don't know based on the provided document."
 
 Context:
 {context}
@@ -121,18 +122,21 @@ Question:
 
 Answer:
 """
+    try:
+        llm = ChatOllama(model="gemma3:4b")
+        response = llm.invoke(prompt)
+        print("\n" + "=" * 65)
+        print("💡 [FINAL ANSWER]")
+        print("=" * 65)
+        print(response.content)
+    except Exception as e:
+        print(f"\n⚠️ Note: Local Ollama generation skipped ({e}).")
+        print("To run local generation, ensure Ollama is running (`ollama serve` and `ollama run gemma3:4b`).")
+        print("\nRetrieved Context Summary:")
+        print(context[:400] + "...")
 
 
-# =========================
-# 11. Generate Answer
-# =========================
-
-response = llm.invoke(prompt)
-
-
-# =========================
-# 12. Print Final Answer
-# =========================
-
-print("\nFinal Answer:")
-print(response.content)
+if __name__ == "__main__":
+    cli_pdf = sys.argv[1] if len(sys.argv) > 1 else None
+    cli_query = sys.argv[2] if len(sys.argv) > 2 else None
+    run_pdf_chatbot(cli_pdf, cli_query)

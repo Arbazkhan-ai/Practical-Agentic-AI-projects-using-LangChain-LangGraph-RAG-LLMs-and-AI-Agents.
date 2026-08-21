@@ -4,7 +4,6 @@
 .env.*
 !.env.example
 
-
 # Python bytecode & cache
 __pycache__/
 *.py[cod]
@@ -15,3 +14,8 @@ venv/
 .venv/
 env/
 ENV/
+
+# Chroma & vector DB local caches
+.chroma/
+chroma.sqlite3
+
